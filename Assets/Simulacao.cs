@@ -1,6 +1,8 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class Simulacao : MonoBehaviour {
@@ -16,28 +18,42 @@ public class Simulacao : MonoBehaviour {
     private List<Pagina> mapaMemoria;
 
     private int contador;
-    private int unidadeTempo = 100;
+    private int unidadeTempo = 50;
     private int velocidade = 1;
     private int tempo;
 
-    void Start () {
+    private bool pause;
 
+    void Start() {
+        
         this.processos = new List<Processo>();
         this.processosAlocados = new List<Processo>();
         this.processosDesalocados = new List<Processo>();
         this.mapaMemoria = new List<Pagina>();
 
-        this.totalPaginas = Simulacao.tamMemoria / Simulacao.tamPagina;
-
+        this.pause = true;
+        
         this.tempo = 0;
-
         GameObject.Find("Canvas/ImageMapa/SliderVelocidade").GetComponent<Slider>().maxValue = this.unidadeTempo;
 
-        //string[] lines = System.IO.File.ReadAllLines(simulacao.path);
+        File.Delete("logSaida.csv");
+        File.Create("logSaida.csv");
+        
+        //StreamWriter writer = new StreamWriter("logSaida.csv", true);
+        //writer.WriteLine("TEMPO;PROCESSO;PAGINA;AÇÃO");
+        //writer.Close();
+
+        string[] lines = System.IO.File.ReadAllLines(Simulacao.path);
+
+        /**
+        Simulacao.tamMemoria = 512;
+        Simulacao.tamPagina = 128;
         string[] lines = System.IO.File.ReadAllLines("C:/Users/Gabriel Vinicius/Documents/SimuladorPaginacao/processos.txt");
+        /**/
+
+        this.totalPaginas = Simulacao.tamMemoria / Simulacao.tamPagina;
 
         string[] dados;
-
         foreach (string line in lines) {
             dados = line.Split(',');
 
@@ -55,53 +71,66 @@ public class Simulacao : MonoBehaviour {
 	
 	void Update () {
 
-        if(this.contador >= this.unidadeTempo && (this.processos.Count > 0 || this.processosAlocados.Count > 0)) {
-            this.tempo++;
-
-            foreach (Processo processo in this.processosAlocados) {
-                if (processo.Contador == 0) { 
-                    DesalocarProcesso(processo);
+        if(!this.pause) {
+            
+            if(this.contador >= this.unidadeTempo && (this.processos.Count > 0 || this.processosAlocados.Count > 0)) {
+                this.tempo++;
+            
+                foreach (Processo processo in this.processosAlocados) {
+                    if (processo.Contador <= 0) {
+                        Debug.Log("1. Desalocar processo " + processo.Id);
+                        DesalocarProcesso(processo);
+                    }
                 }
-            }
 
-            foreach (Processo processo in this.processos) {
-                if (processo.TempoEntrada <= this.tempo) {
-                    if (!this.AlocarProcesso(processo)) {
+                foreach (Processo processo in this.processos) {
+                    if (processo.TempoEntrada <= this.tempo) {
+                        if (!this.AlocarProcesso(processo)) {
+                            break;
+                        }
+                    } else {
                         break;
                     }
-                } else {
-                    break;
                 }
-            }
             
-            foreach(Processo processo in this.processosAlocados) {
-                this.processos.Remove(processo);
+                foreach(Processo processo in this.processosAlocados) {
+                    this.processos.Remove(processo);
                 
-                if(processo.Contador == 0) {
-                    DesalocarProcesso(processo);
-                } else {
-                    processo.Contador--;
+                    if(processo.Contador <= 0) {
+
+                        if(processo.Paginas != null) {
+                            Debug.Log("3. Desalocar processo " + processo.Id);
+                            DesalocarProcesso(processo);
+                        }
+                    
+                    } else {
+                        processo.Contador--;
+                    }
                 }
-            }
             
-            foreach(Processo processo in this.processosDesalocados) {
-                this.processosAlocados.Remove(processo);
+                foreach(Processo processo in this.processosDesalocados) {
+                    this.processosAlocados.Remove(processo);
+                }
+
+                Debug.Log("----------------------");
+                Debug.Log("Tempo: " + this.tempo);
+                Debug.Log("Processos na fila: " + this.processos.Count);
+                Debug.Log("Processos alocados: " + this.processosAlocados.Count);
+                Debug.Log("Processos desalocados: " + this.processosDesalocados.Count);
+                Debug.Log("----------------------");
+
+                this.processosDesalocados.Clear();
+
+                this.contador -= unidadeTempo;
+                GameObject.Find("Canvas/ImageMapa/TextTempo").GetComponent<Text>().text = "Tempo: " + this.tempo;
+            } else {
+                this.contador += this.velocidade;
             }
-
-            this.processosDesalocados.Clear();
-
-            this.contador -= unidadeTempo;
-            GameObject.Find("Canvas/ImageMapa/TextTempo").GetComponent<Text>().text = "Tempo: " + this.tempo;
-        } else {
-            this.contador += this.velocidade;
         }
-		
-	}
+    }
 
     public bool AlocarProcesso(Processo processo) {
-
-        Debug.Log("Tentando alocar P" + processo.Id);
-        
+                
         int numPaginas = (int)Mathf.Ceil((float)processo.Bytes / (float)Simulacao.tamPagina);
         
         List<Pagina> paginas = new List<Pagina>();
@@ -117,11 +146,14 @@ public class Simulacao : MonoBehaviour {
 
         if(numPaginas == 0) {
 
-            Debug.Log("Processo P" + processo.Id + " alocado!");
-
             int bytes = processo.Bytes;
 
-            foreach(Pagina pagina in paginas) {
+            string texto;
+            string textoCSV = "";
+
+            StreamWriter writer = new StreamWriter("logSaida.csv", true);
+
+            foreach (Pagina pagina in paginas) {
                 pagina.Ocupado = true;
                 pagina.Processo = processo;
                 processo.Paginas.Add(pagina);
@@ -134,11 +166,55 @@ public class Simulacao : MonoBehaviour {
                 }
 
                 pagina.Bloco.transform.Find("text").GetComponent<Text>().text = "P" + processo.Id + "( " + pagina.BytesUsados + " / " + pagina.Bytes + " )";
+
+                texto = this.tempo + ";" + processo.Id + ";" + pagina.Id + ";ENTROU";
+
+                textoCSV += "\n" + texto;
+
+                GameObject text = new GameObject("processo" + processo.Id, typeof(Text));
+                text.transform.SetParent(GameObject.Find("Canvas/SVSaida/Viewport/Content").transform);
+                text.GetComponent<RectTransform>().anchorMin = new Vector2(0, 1);
+                text.GetComponent<RectTransform>().anchorMax = new Vector2(1, 1);
+                text.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1);
+                text.GetComponent<RectTransform>().anchoredPosition3D = new Vector3(0, 0, 0);
+                text.GetComponent<RectTransform>().sizeDelta = new Vector2(100, 10);
+                text.GetComponent<Text>().text = texto;
+                text.GetComponent<Text>().font = Font.CreateDynamicFontFromOSFont("Arial", 10);
+                text.GetComponent<Text>().fontSize = 10;
+                text.GetComponent<Text>().color = Color.black;
+                
             }
+            writer.WriteLine(textoCSV.Substring(1));
+            writer.Close();
+            
+            Debug.Log("2. Alocar processo " + processo.Id);
 
             processo.Paginas = paginas;
             this.processosAlocados.Add(processo);
             Destroy(GameObject.Find("Canvas/SVProcessos/Viewport/Content/processo" + processo.Id).gameObject);
+            
+            return true;
+        }
+        
+        return false;
+    }
+
+    public void DesalocarProcesso(Processo processo) {
+        
+        string texto;
+        string textoCSV = "";
+
+        StreamWriter writer = new StreamWriter("logSaida.csv", true);
+
+        foreach (Pagina pagina in processo.Paginas) {
+            pagina.Ocupado = false;
+            pagina.BytesUsados = 0;
+            pagina.Processo = null;
+            pagina.Bloco.transform.Find("text").GetComponent<Text>().text = "";
+
+            texto = this.tempo + ";" + processo.Id + ";" + pagina.Id + ";SAIU";
+
+            textoCSV += "\n" + texto;
 
             GameObject text = new GameObject("processo" + processo.Id, typeof(Text));
             text.transform.SetParent(GameObject.Find("Canvas/SVSaida/Viewport/Content").transform);
@@ -147,39 +223,17 @@ public class Simulacao : MonoBehaviour {
             text.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1);
             text.GetComponent<RectTransform>().anchoredPosition3D = new Vector3(0, 0, 0);
             text.GetComponent<RectTransform>().sizeDelta = new Vector2(100, 10);
-            text.GetComponent<Text>().text = this.tempo + ", " + processo.Id + ", " + processo.Paginas[0].Id + ", ENTROU";
+            text.GetComponent<Text>().text = texto;
             text.GetComponent<Text>().font = Font.CreateDynamicFontFromOSFont("Arial", 10);
             text.GetComponent<Text>().fontSize = 10;
             text.GetComponent<Text>().color = Color.black;
 
-            return true;
+            
         }
-
-        Debug.Log("Processo P" + processo.Id + " não foi alocado!");
-        return false;
-    }
-
-    public void DesalocarProcesso(Processo processo) {
-
-        foreach (Pagina pagina in processo.Paginas) {
-            pagina.Ocupado = false;
-            pagina.BytesUsados = 0;
-            pagina.Processo = null;
-            pagina.Bloco.transform.Find("text").GetComponent<Text>().text = "";
-        }
+        writer.WriteLine(textoCSV.Substring(1));
+        writer.Close();
         
-        GameObject text = new GameObject("processo" + processo.Id, typeof(Text));
-        text.transform.SetParent(GameObject.Find("Canvas/SVSaida/Viewport/Content").transform);
-        text.GetComponent<RectTransform>().anchorMin = new Vector2(0, 1);
-        text.GetComponent<RectTransform>().anchorMax = new Vector2(1, 1);
-        text.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1);
-        text.GetComponent<RectTransform>().anchoredPosition3D = new Vector3(0, 0, 0);
-        text.GetComponent<RectTransform>().sizeDelta = new Vector2(100, 10);
-        text.GetComponent<Text>().text = this.tempo + ", " + processo.Id + ", " + processo.Paginas[0].Id + ", SAIU";
-        text.GetComponent<Text>().font = Font.CreateDynamicFontFromOSFont("Arial", 10);
-        text.GetComponent<Text>().fontSize = 10;
-        text.GetComponent<Text>().color = Color.black;
-
+        processo.Paginas = null;
         this.processosDesalocados.Add(processo);
     }
 
@@ -337,6 +391,23 @@ public class Simulacao : MonoBehaviour {
         }
 
         return largura;
+    }
+
+    public void Voltar() {
+        SceneManager.LoadScene("inicio");
+    }
+
+    public void IniciarPausar() {
+
+        this.pause = !this.pause;
+
+        Text texto = GameObject.Find("Canvas/ButtonIniciar/Text").GetComponent<Text>();
+
+        if(this.pause) {
+            texto.text = "Iniciar";
+        } else {
+            texto.text = "Pausar";
+        }
     }
 
 }
