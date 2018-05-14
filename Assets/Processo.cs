@@ -10,6 +10,10 @@ public class Processo {
 
     private List<Pagina> paginas;
 
+    // Contabilidade
+    private bool precisouAguardar = false;
+    private int tempoQueEsperou = 0;
+
     public Processo(int id, int tempoEntrada, int tempoSaida, int bytes) {
         this.id = id;
         this.tempoEntrada = tempoEntrada;
@@ -72,6 +76,26 @@ public class Processo {
 
         set {
             contador = value;
+        }
+    }
+
+    public bool PrecisouAguardar {
+        get {
+            return precisouAguardar;
+        }
+
+        set {
+            precisouAguardar = value;
+        }
+    }
+
+    public int TempoQueEsperou {
+        get {
+            return tempoQueEsperou;
+        }
+
+        set {
+            tempoQueEsperou = value;
         }
     }
 }
