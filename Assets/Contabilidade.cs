@@ -26,8 +26,6 @@ public class Contabilidade : MonoBehaviour {
         GameObject.Find("Canvas/PanelEssencial/TextContabilidade3").GetComponent<Text>().text += " " + Contabilidade.qtdProcessosSemAguardar;
         GameObject.Find("Canvas/PanelEssencial/TextContabilidade4").GetComponent<Text>().text += " " + Contabilidade.qtdProcessosAguardar;
         
-
-
         GameObject.Find("Canvas/PanelExtra/TextContabilidade1").GetComponent<Text>().text += " " + ((float)Contabilidade.tempoGeralEspera / (float)Contabilidade.qtdProcessos).ToString("n2");
         GameObject.Find("Canvas/PanelExtra/TextContabilidade2").GetComponent<Text>().text += " " + ((float)Contabilidade.tempoEsperaEsperaram / (float)Contabilidade.qtdProcessosAguardar).ToString("n2");
         GameObject.Find("Canvas/PanelExtra/TextContabilidade3").GetComponent<Text>().text += " " + Contabilidade.qtdTempoFragmentacaoInterna;

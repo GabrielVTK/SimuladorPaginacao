@@ -1,11 +1,14 @@
 ﻿using SFB;
+using System.IO;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class Inicio : MonoBehaviour {
     
-	void Start () {}
+	void Start () {
+        Directory.CreateDirectory("resultados");
+    }
 	
 	void Update () {}
 
